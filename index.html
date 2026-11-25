@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#030817" />
+  <meta name="description" content="TALENOVA Weather Pro 3.5 — Realistic 3D Earth, Global Forecast Radar Map, 7-Day Forecast, and Voice AI Weather Assistant." />
+  <title>TALENOVA Weather Pro 3.5</title>
+  <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./css/style.css" />
+  <!-- Zero-build CDN libraries (no API keys required) -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
+  <script src="./js/app.js" defer></script>
+</head>
+<body>
+  <div id="offline-banner" class="offline-banner hidden" role="status">
+    <i data-lucide="wifi-off"></i>
+    <span data-i18n="offlineBanner">Offline mode: displaying cached weather telemetry.</span>
+  </div>
+
+  <div class="app-shell">
+    <!-- Desktop Sidebar -->
+    <aside class="sidebar glass-panel">
+      <div class="brand-block">
+        <img src="./assets/favicon.svg" alt="TALENOVA Logo" class="brand-logo" />
+        <div>
+          <div class="brand-title">TALENOVA</div>
+          <div class="brand-sub">WEATHER PRO 3.5</div>
+        </div>
+      </div>
+
+      <nav class="side-nav" aria-label="Primary Navigation">
+        <button class="nav-btn active" data-view="home">
+          <i data-lucide="home"></i><span data-i18n="navHome">Home</span>
+        </button>
+        <button class="nav-btn" data-view="map">
+          <i data-lucide="map"></i><span data-i18n="navMap">Weather Map</span>
+        </button>
+        <button class="nav-btn" data-view="forecast">
+          <i data-lucide="bar-chart-3"></i><span data-i18n="navForecast">7-Day &amp; Analytics</span>
+        </button>
+        <button class="nav-btn" data-view="ai">
+          <i data-lucide="bot"></i><span data-i18n="navAI">AI Assistant</span>
+        </button>
+        <button class="nav-btn" data-view="settings">
+          <i data-lucide="settings"></i><span data-i18n="navSettings">Settings</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title" data-i18n="savedCities">Saved Cities</div>
+        <div id="sidebar-city-list" class="city-list"></div>
+      </div>
+
+      <div class="sidebar-footer">
+        <div id="live-clock" class="live-clock">--:--:--</div>
+        <div class="attribution-mini">Data: Open-Meteo (CC BY 4.0)</div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <div class="main-area">
+      <!-- Top Navigation Bar -->
+      <header class="topbar glass-panel">
+        <div class="topbar-left">
+          <div class="mobile-brand">
+            <img src="./assets/favicon.svg" alt="TALENOVA" class="brand-logo-sm" />
+            <span class="brand-title-sm">TALENOVA</span>
+          </div>
+          <div class="search-wrapper">
+            <i data-lucide="search" class="search-icon"></i>
+            <input
+              id="city-search-input"
+              type="text"
+              autocomplete="off"
+              placeholder="Search city (e.g. Yokohama, Tokyo, London)..."
+              aria-label="Search city"
+            />
+            <div id="search-dropdown" class="search-dropdown hidden"></div>
+          </div>
+        </div>
+
+        <div class="topbar-actions">
+          <button id="btn-gps" class="icon-btn" title="Use Current Location" aria-label="Use Current Location">
+            <i data-lucide="crosshair"></i>
+          </button>
+          <button id="btn-refresh" class="icon-btn" title="Refresh Weather Data" aria-label="Refresh Weather Data">
+            <i data-lucide="refresh-cw"></i>
+          </button>
+          <button id="btn-unit" class="pill-btn" title="Toggle °C / °F">°C</button>
+          <button id="btn-lang" class="pill-btn" title="Toggle English / Japanese">EN</button>
+          <button id="btn-theme" class="icon-btn" title="Toggle Dark / Light Theme" aria-label="Toggle Theme">
+            <i data-lucide="sun"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- Global Error / Loading Status Bar -->
+      <div id="api-status-bar" class="status-bar hidden"></div>
+
+      <!-- VIEW 1: HOME DASHBOARD -->
+      <main id="view-home" class="view active">
+        <!-- Hero Row: Current Weather + Interactive 3D Earth -->
+        <section class="hero-grid">
+          <!-- Current Weather Card -->
+          <div class="glass-panel current-card">
+            <div class="current-header">
+              <div>
+                <div class="location-pill">
+                  <i data-lucide="map-pin"></i>
+                  <span id="current-city-name">Yokohama, Japan</span>
+                </div>
+                <div id="current-updated" class="muted-xs">Syncing live telemetry...</div>
+              </div>
+              <span id="current-local-time" class="badge-cyan">--:--</span>
+            </div>
+
+            <div class="current-main">
+              <div id="current-weather-icon" class="weather-glyph">⛅</div>
+              <div class="temp-block">
+                <div id="current-temp" class="hero-temp">--°</div>
+                <div id="current-condition" class="hero-condition">Loading...</div>
+              </div>
+            </div>
+
+            <div class="current-sub">
+              <span><span data-i18n="feelsLike">Feels like</span> <strong id="current-feels">--°</strong></span>
+              <span class="divider-dot">•</span>
+              <span><span data-i18n="high">High</span> <strong id="current-high">--°</strong></span>
+              <span class="divider-dot">•</span>
+              <span><span data-i18n="low">Low</span> <strong id="current-low">--°</strong></span>
+            </div>
+
+            <!-- Mobile Saved City Quick Switcher -->
+            <div id="mobile-city-chips" class="city-chips"></div>
+          </div>
+
+          <!-- Interactive 3D Holographic Earth -->
+          <div class="glass-panel globe-card">
+            <div class="globe-hud-top">
+              <div class="globe-badge">
+                <span class="pulse-dot"></span>
+                <span id="globe-target-label">TARGET: YOKOHAMA</span>
+              </div>
+              <div class="globe-controls">
+                <button id="toggle-clouds" class="chip-btn active">Clouds</button>
+                <button id="toggle-fx" class="chip-btn active">3D FX</button>
+                <button id="toggle-grid" class="chip-btn">Grid</button>
+                <button id="toggle-orbits" class="chip-btn active">Orbits</button>
+              </div>
+            </div>
+
+            <div id="earth-canvas-container" class="earth-container" aria-label="Interactive 3D Earth"></div>
+
+            <div class="globe-hud-bottom">
+              <span id="globe-fx-badge" class="muted-xs">Drag to rotate • Scroll to zoom</span>
+              <span id="globe-cloud-readout" class="badge-cyan">Cloud Cover: --%</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4 Compact Weather Intelligence Cards -->
+        <section class="intel-grid">
+          <div class="glass-panel intel-card">
+            <div class="intel-label"><i data-lucide="wind"></i><span data-i18n="windSpeed">Wind Speed</span></div>
+            <div id="intel-wind" class="intel-value">--</div>
+            <div id="intel-wind-dir" class="muted-xs">--</div>
+          </div>
+          <div class="glass-panel intel-card">
+            <div class="intel-label"><i data-lucide="droplets"></i><span data-i18n="precipitation">Precipitation</span></div>
+            <div id="intel-precip" class="intel-value">--</div>
+            <div id="intel-precip-prob" class="muted-xs">--%</div>
+          </div>
+          <div class="glass-panel intel-card">
+            <div class="intel-label"><i data-lucide="eye"></i><span data-i18n="visibility">Visibility</span></div>
+            <div id="intel-visibility" class="intel-value">--</div>
+            <div class="muted-xs" data-i18n="opticalRange">Optical Range</div>
+          </div>
+          <div class="glass-panel intel-card">
+            <div class="intel-label"><i data-lucide="sunrise"></i><span data-i18n="sunCycle">Sunrise / Sunset</span></div>
+            <div id="intel-sunrise" class="intel-value-sm">--:--</div>
+            <div id="intel-sunset" class="muted-xs">--:--</div>
+          </div>
+        </section>
+
+        <!-- 24-Hour Scrollable Forecast -->
+        <section class="glass-panel section-card">
+          <div class="section-header">
+            <h2 class="section-title"><i data-lucide="clock"></i><span data-i18n="hourlyForecast">Hourly Forecast (24h)</span></h2>
+            <span class="muted-xs" data-i18n="scrollHint">Swipe / Scroll →</span>
+          </div>
+          <div id="hourly-strip" class="hourly-strip"></div>
+        </section>
+
+        <!-- Mandatory 7-Day Weather Forecast -->
+        <section class="glass-panel section-card">
+          <div class="section-header">
+            <h2 class="section-title"><i data-lucide="calendar-days"></i><span data-i18n="sevenDayForecast">7-Day Weather Forecast</span></h2>
+            <span class="muted-xs" data-i18n="tapDayDetails">Click a day for details</span>
+          </div>
+          <div id="seven-day-rail" class="seven-day-rail"></div>
+          <div id="seven-day-detail" class="day-detail-drawer hidden"></div>
+        </section>
+
+        <!-- Map Preview + 24-Hour Temperature Curve -->
+        <section class="split-grid">
+          <div class="glass-panel section-card map-preview-card">
+            <div class="section-header">
+              <h2 class="section-title"><i data-lucide="radar"></i><span data-i18n="weatherMap">Weather Radar Map</span></h2>
+              <button id="btn-open-map" class="pill-btn-primary">
+                <span data-i18n="viewMap">View Map</span> →
+              </button>
+            </div>
+            <canvas id="home-map-preview-canvas" class="map-preview-canvas"></canvas>
+            <div class="map-preview-footer">
+              <span class="muted-xs">Open-Meteo Forecast Field • Interactive Tactical Engine</span>
+              <span id="preview-precip-badge" class="badge-cyan">Live Grid</span>
+            </div>
+          </div>
+
+          <div class="glass-panel section-card">
+            <div class="section-header">
+              <h2 class="section-title"><i data-lucide="trending-up"></i><span data-i18n="tempChart24h">24-Hour Temperature Curve</span></h2>
+              <span id="chart-unit-label" class="muted-xs">°C</span>
+            </div>
+            <div class="chart-box">
+              <canvas id="home-temp-chart"></canvas>
+            </div>
+          </div>
+        </section>
+
+        <!-- Additional Atmospheric Telemetry Matrix -->
+        <section class="glass-panel section-card">
+          <div class="section-header">
+            <h2 class="section-title"><i data-lucide="gauge"></i><span data-i18n="atmosphericMatrix">Atmospheric &amp; Air Quality Intelligence</span></h2>
+          </div>
+          <div class="matrix-grid">
+            <div class="matrix-item">
+              <span class="muted-xs">US AQI</span>
+              <strong id="m-aqi">--</strong>
+              <span id="m-aqi-label" class="muted-xs">--</span>
+            </div>
+            <div class="matrix-item">
+              <span class="muted-xs">UV Index</span>
+              <strong id="m-uv">--</strong>
+              <span id="m-uv-label" class="muted-xs">--</span>
+            </div>
+            <div class="matrix-item">
+              <span class="muted-xs" data-i18n="humidity">Humidity</span>
+              <strong id="m-humidity">--%</strong>
+              <span class="muted-xs">Relative</span>
+            </div>
+            <div class="matrix-item">
+              <span class="muted-xs" data-i18n="pressure">Pressure</span>
+              <strong id="m-pressure">-- hPa</strong>
+              <span class="muted-xs">Surface</span>
+            </div>
+            <div class="matrix-item">
+              <span class="muted-xs" data-i18n="cloudCover">Cloud Cover</span>
+              <strong id="m-cloud">--%</strong>
+              <span class="muted-xs">Sky Fraction</span>
+            </div>
+            <div class="matrix-item">
+              <span class="muted-xs" data-i18n="windGusts">Wind Gusts</span>
+              <strong id="m-gusts">--</strong>
+              <span class="muted-xs">Peak 10m</span>
+            </div>
+            <div class="matrix-item">
+              <span class="muted-xs">PM2.5 / PM10</span>
+              <strong id="m-pm">--</strong>
+              <span class="muted-xs">µg/m³</span>
+            </div>
+            <div class="matrix-item">
+              <span class="muted-xs" data-i18n="moonPhase">Moon Phase</span>
+              <strong id="m-moon">--</strong>
+              <span class="muted-xs">Lunar Cycle</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Quick AI Assistant Launcher Bar -->
+        <section class="glass-panel ai-launcher-bar" id="home-ai-launcher">
+          <div class="ai-launcher-left">
+            <div class="ai-avatar"><i data-lucide="bot"></i></div>
+            <div>
+              <div class="ai-launcher-title" data-i18n="aiTitle">Weather AI Assistant</div>
+              <div class="muted-xs" data-i18n="aiSubtitle">Ask about rain, clothing, UV, travel, or compare cities!</div>
+            </div>
+          </div>
+          <div class="ai-launcher-right">
+            <button id="home-voice-btn" class="voice-circle-btn" title="Voice Input" aria-label="Voice Input">
+              <i data-lucide="mic"></i>
+            </button>
+            <i data-lucide="chevron-right"></i>
+          </div>
+        </section>
+      </main>
+
+      <!-- VIEW 2: GLOBAL WEATHER & RADAR TACTICAL MAP -->
+      <main id="view-map" class="view">
+        <section class="glass-panel map-shell">
+          <div class="map-toolbar">
+            <div class="map-toolbar-group">
+              <button class="chip-btn active" data-basemap="satellite">Satellite</button>
+              <button class="chip-btn" data-basemap="dark">Dark</button>
+              <button class="chip-btn" data-basemap="street">Street</button>
+              <button class="chip-btn" data-basemap="terrain">Terrain</button>
+              <button class="chip-btn" data-basemap="vector">Offline Vector</button>
+            </div>
+            <div class="map-toolbar-group">
+              <button class="chip-btn active" data-layer="precip">Precipitation</button>
+              <button class="chip-btn active" data-layer="wind">Wind Particles</button>
+              <button class="chip-btn" data-layer="clouds">Clouds</button>
+              <button class="chip-btn" data-layer="temp">Temperature</button>
+              <button class="chip-btn" data-layer="pressure">Isobars</button>
+              <button class="chip-btn active" data-layer="sweep">Radar Sweep</button>
+            </div>
+          </div>
+
+          <div id="map-tile-warning" class="tile-warning hidden">
+            <span>Some basemap tiles could not be loaded.</span>
+            <div>
+              <button id="btn-retry-tiles" class="chip-btn">Retry Tiles</button>
+              <button id="btn-force-vector" class="chip-btn">Use Offline Vector</button>
+            </div>
+          </div>
+
+          <div class="map-viewport" id="tactical-map-viewport">
+            <canvas id="tactical-map-canvas"></canvas>
+
+            <!-- Floating Zoom & GPS Controls -->
+            <div class="map-zoom-controls">
+              <button id="map-zoom-in" class="icon-btn" title="Zoom In">+</button>
+              <button id="map-zoom-out" class="icon-btn" title="Zoom Out">−</button>
+              <button id="map-center-active" class="icon-btn" title="Center on Selected City">
+                <i data-lucide="crosshair"></i>
+              </button>
+            </div>
+
+            <!-- Click-to-Inspect Coordinate Popup -->
+            <div id="map-inspect-card" class="glass-panel map-inspect-card hidden">
+              <div class="inspect-header">
+                <strong id="inspect-coords">Coordinates</strong>
+                <button id="close-inspect" class="close-btn">✕</button>
+              </div>
+              <div id="inspect-body" class="inspect-body">Click anywhere on the map to inspect live weather.</div>
+            </div>
+
+            <!-- Visible Attribution Bar -->
+            <div id="map-attribution" class="map-attribution">
+              Tiles: Esri World Imagery • Weather Forecast Field: Open-Meteo (CC BY 4.0)
+            </div>
+          </div>
+
+          <!-- 24-Hour Radar Playback Timeline -->
+          <div class="radar-timeline">
+            <button id="radar-play-btn" class="pill-btn-primary">▶ Play 24h</button>
+            <input id="radar-slider" type="range" min="0" max="23" value="0" aria-label="Forecast Hour" />
+            <span id="radar-timestamp" class="badge-cyan">Now (Forecast)</span>
+          </div>
+        </section>
+      </main>
+
+      <!-- VIEW 3: 7-DAY & ANALYTICS -->
+      <main id="view-forecast" class="view">
+        <section class="split-grid">
+          <div class="glass-panel section-card">
+            <div class="section-header">
+              <h2 class="section-title"><i data-lucide="trending-up"></i><span>7-Day High / Low Trend</span></h2>
+            </div>
+            <div class="chart-box">
+              <canvas id="weekly-trend-chart"></canvas>
+            </div>
+          </div>
+
+          <div class="glass-panel section-card">
+            <div class="section-header">
+              <h2 class="section-title"><i data-lucide="cloud-rain"></i><span>12-Hour Rain Probability &amp; Humidity</span></h2>
+            </div>
+            <div class="chart-box">
+              <canvas id="precip-humidity-chart"></canvas>
+            </div>
+          </div>
+        </section>
+
+        <section class="glass-panel section-card">
+          <div class="section-header">
+            <h2 class="section-title"><i data-lucide="globe"></i><span>Monitored Cities Comparison</span></h2>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>City</th>
+                  <th>Condition</th>
+                  <th>Temp</th>
+                  <th>High / Low</th>
+                  <th>Wind</th>
+                  <th>Rain %</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="cities-comparison-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+
+      <!-- VIEW 4: AI WEATHER ASSISTANT -->
+      <main id="view-ai" class="view">
+        <section class="glass-panel ai-panel">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title"><i data-lucide="bot"></i><span data-i18n="aiTitle">Weather AI Assistant</span></h2>
+              <div id="ai-mode-status" class="muted-xs">Mode: Built-in Meteorological Engine (No API Key Required)</div>
+            </div>
+            <button id="ai-speak-toggle" class="chip-btn active">🔊 Voice Output: ON</button>
+          </div>
+
+          <div class="ai-quick-prompts">
+            <button class="chip-btn ai-prompt-btn" data-q="Will it rain today?">Will it rain today?</button>
+            <button class="chip-btn ai-prompt-btn" data-q="What should I wear today?">What should I wear?</button>
+            <button class="chip-btn ai-prompt-btn" data-q="Give me a 7-day forecast summary.">7-day summary</button>
+            <button class="chip-btn ai-prompt-btn" data-q="Compare my saved cities.">Compare cities</button>
+            <button class="chip-btn ai-prompt-btn" data-q="Is it good for outdoor travel today?">Travel advice</button>
+          </div>
+
+          <div id="ai-chat-log" class="ai-chat-log"></div>
+
+          <form id="ai-chat-form" class="ai-input-row">
+            <button type="button" id="ai-mic-btn" class="icon-btn" title="Voice Input">
+              <i data-lucide="mic"></i>
+            </button>
+            <input id="ai-input" type="text" placeholder="Ask anything about the weather..." autocomplete="off" />
+            <button type="submit" class="pill-btn-primary">Send</button>
+          </form>
+        </section>
+      </main>
+
+      <!-- VIEW 5: SETTINGS -->
+      <main id="view-settings" class="view">
+        <section class="split-grid">
+          <div class="glass-panel section-card">
+            <h2 class="section-title"><i data-lucide="sliders"></i><span>Display &amp; Units</span></h2>
+            <div class="settings-list">
+              <label class="setting-row">
+                <span>Temperature Unit</span>
+                <select id="set-temp-unit">
+                  <option value="C">Celsius (°C)</option>
+                  <option value="F">Fahrenheit (°F)</option>
+                </select>
+              </label>
+              <label class="setting-row">
+                <span>Wind Speed Unit</span>
+                <select id="set-wind-unit">
+                  <option value="kmh">km/h</option>
+                  <option value="mph">mph</option>
+                  <option value="ms">m/s</option>
+                </select>
+              </label>
+              <label class="setting-row">
+                <span>Language</span>
+                <select id="set-lang">
+                  <option value="en">English</option>
+                  <option value="ja">日本語 (Japanese)</option>
+                </select>
+              </label>
+              <label class="setting-row">
+                <span>Theme</span>
+                <select id="set-theme">
+                  <option value="dark">Deep Space Navy (Dark)</option>
+                  <option value="light">Arctic Daylight (Light)</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div class="glass-panel section-card">
+            <h2 class="section-title"><i data-lucide="cpu"></i><span>Optional Local Ollama LLM</span></h2>
+            <p class="muted-xs" style="margin-bottom: 12px;">
+              Works without any API key using the built-in AI assistant. Optionally connect a local Ollama instance started with <code>OLLAMA_ORIGINS="*" ollama serve</code>.
+            </p>
+            <div class="settings-list">
+              <label class="setting-row">
+                <span>Enable Ollama</span>
+                <input id="set-ollama-enabled" type="checkbox" />
+              </label>
+              <label class="setting-row">
+                <span>Endpoint URL</span>
+                <input id="set-ollama-url" type="text" value="http://localhost:11434" />
+              </label>
+              <label class="setting-row">
+                <span>Model Name</span>
+                <input id="set-ollama-model" type="text" value="llama3.2" />
+              </label>
+              <div class="setting-actions">
+                <button id="btn-test-ollama" class="pill-btn-primary">Test Connection &amp; Models</button>
+                <span id="ollama-status-msg" class="muted-xs">Not tested</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="glass-panel section-card">
+          <div class="section-header">
+            <h2 class="section-title"><i data-lucide="database"></i><span>Cache &amp; Saved Cities</span></h2>
+            <button id="btn-clear-cache" class="chip-btn">Clear Cached Weather</button>
+          </div>
+          <p class="muted-xs">
+            Weather, air quality, and geocoding data are provided free of charge by Open-Meteo (CC BY 4.0). Map tiles are served by Esri ArcGIS Online with an automatic offline vector fallback.
+          </p>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Mobile Bottom Navigation Dock -->
+  <nav class="bottom-nav glass-panel" aria-label="Mobile Navigation">
+    <button class="bnav-btn active" data-view="home">
+      <i data-lucide="home"></i><span data-i18n="navHome">Home</span>
+    </button>
+    <button class="bnav-btn" data-view="map">
+      <i data-lucide="map"></i><span data-i18n="navMap">Map</span>
+    </button>
+    <button class="bnav-btn" data-view="forecast">
+      <i data-lucide="bar-chart-3"></i><span data-i18n="navForecast">Forecast</span>
+    </button>
+    <button class="bnav-btn" data-view="ai">
+      <i data-lucide="bot"></i><span data-i18n="navAI">AI</span>
+    </button>
+    <button class="bnav-btn" data-view="settings">
+      <i data-lucide="settings"></i><span data-i18n="navSettings">Settings</span>
+    </button>
+  </nav>
+</body>
+</html>
+
+
